@@ -20,3 +20,5 @@ detachInterrupt KEYWORD2
 #######################################
 # Constants (LITERAL1)
 #######################################
+TOGGLE LITERAL1
+PWM LITERAL1
