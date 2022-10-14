@@ -19,9 +19,9 @@ This library is compatible with the **avr** architecture so you should be able t
 
 >## `void pinMode(const uint8_t &mode) const;`
 >
->### Parameters:
->
 >Sets the pin's mode
+>
+>### Parameters:
 >
 >Mode: can assume four integer values.
 >
