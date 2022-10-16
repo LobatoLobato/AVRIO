@@ -230,3 +230,4 @@ This library is compatible with the **avr** architecture so you should be able t
 >digitalWrite(pin.getPin(), LOW); //Sets the pin's state to low using Arduino's digitalWrite()
 >```
 
+a
