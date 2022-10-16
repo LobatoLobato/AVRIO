@@ -229,4 +229,4 @@ This library is compatible with the **avr** architecture so you should be able t
 >int pinNumber = pin.getPin(); //Assigns 1, integer used in the constructor, to 'pinNumber'
 >digitalWrite(pin.getPin(), LOW); //Sets the pin's state to low using Arduino's digitalWrite()
 >```
-a
+
