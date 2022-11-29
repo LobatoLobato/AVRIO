@@ -339,7 +339,7 @@ void test_analog(void) {
     aw_pin.analogWrite(127);
     delay(100);
     result = ar_pin.analogRead();
-    TEST_ASSERT_TRUE(result >= 500 && result <= 600);
+    TEST_ASSERT_TRUE(result >= 400 && result <= 600);
 
     aw_pin.analogWrite(255);
     delay(100);
