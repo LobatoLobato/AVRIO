@@ -1,5 +1,9 @@
 # AVRIO
 
+## Headers
+
+This library exposes the AVRIO.h header containing the AVRIO namespace with all classes and functions
+
 ## Description
 
 Fast Pin IO library for AVR Architecture. Abstracts pins into a Pin class that stores register adresses when instantiated for faster and easier pin manipulation.

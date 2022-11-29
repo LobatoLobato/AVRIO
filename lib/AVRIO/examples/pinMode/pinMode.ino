@@ -13,6 +13,7 @@ void setup() {
     pin.pinMode(AVRIO::pin_m::InputPullup);  // Sets pin's mode as input pull-up
     pin.pinMode(AVRIO::pin_m::Output);       // Sets pin's mode as output
     pin.pinMode(AVRIO::pin_m::Pwm);          // Sets pin's mode as pwm output
+    int a = 2 + 2;
 }
 void loop() {
 }
