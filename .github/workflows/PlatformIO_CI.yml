@@ -30,6 +30,6 @@ jobs:
     - name: Login to PlatformIO
       run: pio account login -u lobatolobato -p ${{ secrets.PIO_PSSWD }}
     - name: Run PlatformIO
-      run: pio pkg publish
+      run: pio pkg publish --no-interactive
     - name: Logout of PlatformIO
       run: pio account logout
