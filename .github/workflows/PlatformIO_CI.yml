@@ -27,5 +27,9 @@ jobs:
       run: |
         python -m pip install --upgrade pip
         pip install --upgrade platformio
+    - name: Login to PlatformIO
+      run: pio account login -u lobatolobato -p ${{ secrets.PIO_PSSWD }}
     - name: Run PlatformIO
       run: pio pkg publish
+    - name: Logout of PlatformIO
+      run: pio account logout
