@@ -2,7 +2,7 @@
   "name": "AVRIO",
   "version": "2.0.0",
   "description": "Fast Pin IO library for AVR Architecture. Abstracts pins into a Pin class that stores register adresses when instantiated for faster and easier pin manipulation.",
-  "keywords": "io, pin",
+  "keywords": "io, avr",
   "repository": {
     "type": "git",
     "url": "https://github.com/LobatoLobato/AVRIO.git"
