@@ -7,3 +7,7 @@ repos:
         language: system
         pass_filenames: false
         verbose: true
+      - id: update-lib-version
+        name: update-lib-version
+        entry: node ./lib-version-check/lib-version-check.js
+        language: node

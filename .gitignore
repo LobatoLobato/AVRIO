@@ -1,3 +1,4 @@
 .pio
 .vscode
 build
+lib-version-check/prev.txt
