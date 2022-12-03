@@ -1,9 +1,9 @@
 repos:
-- repo: local
-  hooks:
-    - id: pio-test
-      name: pio-test
-      entry: pio test
-      language: system
-      pass_filenames: false
-      verbose: true
+  - repo: local
+    hooks:
+      - id: pio-test
+        name: pio-test
+        entry: pio remote test
+        language: system
+        pass_filenames: false
+        verbose: true

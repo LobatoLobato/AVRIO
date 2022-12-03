@@ -45,8 +45,8 @@ void AVRIO::Pin::pinMode(const pin_m& mode) const {
 
     noInterrupts();  // Disables interrupts
 
-    turnOffPWM();  // Turns off PWM on the pin
-
+    turnOffPWM();                              // Turns off PWM on the pin
+    Arduino_h::digitalRead(this->arduinoPin);  // TEMPORARY: Turns off pwm, method above doesn't work
     switch (mode) {
         case pin_m::Input:  ///< Sets the pin as an input pin
             *portMode &= ~pinMask;
