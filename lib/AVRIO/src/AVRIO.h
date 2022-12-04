@@ -1,6 +1,7 @@
 #pragma once
 
 #include <Arduino.h>
+#include <ArxTypeTraits.h>
 
 namespace AVRIO {
 enum class input_m : uint8_t {
@@ -30,6 +31,11 @@ enum class write_t : uint8_t {
     Toggle = 2
 };
 
+enum class bit_order : uint8_t {
+    MSBFirst = 1,
+    LSBFirst = 0
+};
+
 /// @brief Class Representing An arduino Pin
 class Pin {
    private:
@@ -51,6 +57,115 @@ class Pin {
     bool isPWMCapable;   ///< Flag indicating whether the pin is pwm capable or not
 
    public:
+    /// @brief Calls init method on all pins passed as arguments
+    static void initializePins() {}
+    /// @brief Calls init method on all pins passed as arguments
+    template <typename... Args>
+    static void initializePins(Pin pin, Args... args) {
+        pin.init();
+        initializePins(args...);
+    }
+    /// @brief Reads serial data in |i.e: from a shift register
+    /// @tparam T The data storage type (works best with unsigned integer types)
+    /// @param dataPin The data input pin
+    /// @param clockPin The clock output pin
+    /// @param bitOrder The bit order (LSBFirst|MSBFirst)
+    /// @return The data read from the shift register
+    template <typename T = uint8_t, typename = std::enable_if_t<std::is_unsigned<T>::value>>
+    static T shiftIn(Pin dataPin, Pin clockPin, bit_order bitOrder = bit_order::LSBFirst) {
+        T value = 0;
+
+        for (T i = 0; i < sizeof(T) * 8; i++) {
+            clockPin.digitalWrite(write_t::High);
+            if (bitOrder == bit_order::LSBFirst)
+                value |= (T)dataPin.digitalRead() << i;
+            else
+                value |= (T)dataPin.digitalRead() << ((sizeof(T) * 8) - 1 - i);
+
+            clockPin.digitalWrite(write_t::Low);
+        }
+        return value;
+    }
+    /// @brief Reads serial data in |i.e: from a shift register
+    /// @tparam T The data storage type (works best with unsigned integer types)
+    /// @param dataPin The data input pin
+    /// @param clockPin The clock output pin
+    /// @param bitOrder The bit order (LSBFirst|MSBFirst)
+    /// @param pulseDelay The time between clock pulse's low and high state
+    /// @return The data read from the shift register
+    template <typename T = uint8_t, typename = std::enable_if_t<std::is_unsigned<T>::value>>
+    static T shiftIn(Pin dataPin, Pin clockPin, bit_order bitOrder, uint64_t pulseDelay, bool ms = false) {
+        T value = 0;
+
+        for (T i = 0; i < sizeof(T) * 8; i++) {
+            clockPin.digitalWrite(write_t::High);
+            uint64_t t = (ms ? millis() : micros());
+            while ((ms ? millis() : micros()) < t + pulseDelay) {
+                _NOP();
+            }
+            if (bitOrder == bit_order::LSBFirst)
+                value |= (T)dataPin.digitalRead() << i;
+            else
+                value |= (T)dataPin.digitalRead() << ((sizeof(T) * 8) - 1 - i);
+
+            clockPin.digitalWrite(write_t::Low);
+        }
+        return value;
+    }
+    /// @brief Sends serial data out |i.e: to a shift register
+    /// @tparam T The data storage type (works best with unsigned integer types)
+    /// @param dataPin  The data output pin
+    /// @param clockPin The clock output pin
+    /// @param val The value to be sent
+    /// @param bitOrder The bit order (LSBFirst|MSBFirst)
+    template <typename T = uint8_t, typename = std::enable_if_t<std::is_unsigned<T>::value>>
+    static void shiftOut(Pin dataPin, Pin clockPin, T val, bit_order bitOrder = bit_order::LSBFirst) {
+        T mod = -1;
+        mod = (mod / 2) + 1;
+        for (uint8_t i = 0; i < sizeof(T) * 8; i++) {
+            if (bitOrder == bit_order::LSBFirst) {
+                dataPin.digitalWrite((AVRIO::write_t)(val & 1));
+                val >>= 1;
+            } else {
+                dataPin.digitalWrite((AVRIO::write_t)((val & mod) != 0));
+                val <<= 1;
+            }
+            clockPin.digitalWrite(AVRIO::write_t::High);
+            clockPin.digitalWrite(AVRIO::write_t::Low);
+        }
+    }
+    /// @brief Sends serial data out |i.e: to a shift register
+    /// @tparam T The data storage type (works best with unsigned integer types)
+    /// @param dataPin  The data output pin
+    /// @param clockPin The clock output pin
+    /// @param val The value to be sent
+    /// @param bitOrder The bit order (LSBFirst|MSBFirst)
+    /// @param pulseDelay The time between clock pulse's low and high state
+    /// @param dataDelay The time between each bit write
+    template <typename T = uint8_t, typename = std::enable_if_t<std::is_unsigned<T>::value>>
+    static void shiftOut(Pin dataPin, Pin clockPin, T val, bit_order bitOrder, uint64_t pulseDelay, uint64_t dataDelay, bool ms = false) {
+        T mod = -1;
+        mod = (mod / 2) + 1;
+        for (uint8_t i = 0; i < sizeof(T) * 8; i++) {
+            uint64_t t = ms ? millis() : micros();
+            while ((ms ? millis() : micros()) < t + dataDelay) {
+                _NOP();
+            }
+            if (bitOrder == bit_order::LSBFirst) {
+                dataPin.digitalWrite((AVRIO::write_t)(val & 1));
+                val >>= 1;
+            } else {
+                dataPin.digitalWrite((AVRIO::write_t)((val & mod) != 0));
+                val <<= 1;
+            }
+            clockPin.digitalWrite(AVRIO::write_t::High);
+            t = ms ? millis() : micros();
+            while ((ms ? millis() : micros()) < t + pulseDelay) {
+                _NOP();
+            }
+            clockPin.digitalWrite(AVRIO::write_t::Low);
+        }
+    }
     // Construtores
     Pin();
 
@@ -59,8 +174,13 @@ class Pin {
     /// @param mode The pin mode
     Pin(byte pin, pin_m mode = pin_m::Input);
 
-    /// @brief Getter for the arduino pin val
-    /// @return Arduino pin val
+    /// @brief Sets the pin's mode
+    /// Only needed if the pin was declared at the global scope and
+    /// pin mode was passed to the constructor
+    void init() const;
+
+    /// @brief Getter for the arduino pin number
+    /// @return Arduino pin number
     uint8_t getPin() const;
 
     /// @brief Reads a digital value on the pin
@@ -70,7 +190,7 @@ class Pin {
     /// @param 2: On Falling Edge,
     /// @param 3: On Rising Edge.
     /// @return Digital value [1] | [0]
-    uint8_t digitalRead(const edge_t& mode = edge_t::Low) const;
+    uint8_t digitalRead(const edge_t& mode = edge_t::None) const;
 
     /// @brief Writes a digital value to the pin [1, 0]
     /// @param state State to set the pin

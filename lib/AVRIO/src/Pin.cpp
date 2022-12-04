@@ -29,15 +29,43 @@ AVRIO::Pin::Pin(byte pin, pin_m mode) {
     this->fState = 0;        // Sets the initial falling edge state
     this->rState = 1;        // Sets the initial rising edge state
 
-    this->mode = (pin_m)255;  // Stores the pin mode
-
-    turnOffPWM();   // Turns off pwm
-    pinMode(mode);  // Sets the pin mode
+    this->mode = mode;  // Stores the pin mode
 }
 
+void AVRIO::Pin::init() const {
+    byte oldSREG = SREG;  // NAO SEI
+
+    noInterrupts();  // Disables interrupts
+
+    switch (mode) {
+        case pin_m::Input:  ///< Sets the pin as an input pin
+            *portMode &= ~pinMask;
+            *portOut &= ~pinMask;
+            break;
+        case pin_m::InputPullup:  ///< Sets the pin as an input pullup pin
+            *portMode &= ~pinMask;
+            *portOut |= pinMask;
+            break;
+        case pin_m::Output:  ///< Sets the pin as an output pin
+            *portMode |= pinMask;
+            *portOut &= ~pinMask;
+            break;
+        case pin_m::Pwm:  ///< Sets the pin as a PWM output pin
+            if (!turnOnPWM())
+                pinMode(pin_m::Input);
+            break;
+    }
+
+    SREG = oldSREG;
+    interrupts();  // Enables interrupts
+}
 void AVRIO::Pin::pinMode(const pin_m& mode) const {
-    if (mode == this->mode)  // If mode is equal to current mode cancel the function
+    if (mode == this->mode)  // If mode is equal to current mode return from the function
         return;
+
+    // turnOffPWM();                              // Turns off PWM on the pin
+    if (this->mode == pin_m::Pwm)
+        Arduino_h::digitalRead(this->arduinoPin);  // TEMPORARY: Turns off pwm, method above doesn't work
 
     this->mode = mode;  // Stores new mode
 
@@ -45,8 +73,6 @@ void AVRIO::Pin::pinMode(const pin_m& mode) const {
 
     noInterrupts();  // Disables interrupts
 
-    turnOffPWM();                              // Turns off PWM on the pin
-    Arduino_h::digitalRead(this->arduinoPin);  // TEMPORARY: Turns off pwm, method above doesn't work
     switch (mode) {
         case pin_m::Input:  ///< Sets the pin as an input pin
             *portMode &= ~pinMask;
