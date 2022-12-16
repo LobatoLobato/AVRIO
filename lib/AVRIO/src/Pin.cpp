@@ -1,16 +1,26 @@
 #include "AVRIO.h"
 
-void cbi(uint8_t sfr, uint8_t bit) {
-    _SFR_BYTE(sfr) &= ~_BV(bit);
+#ifndef cbi
+#define cbi(sfr, bit) (_SFR_BYTE(sfr) &= ~_BV(bit))
+#endif
+#ifndef sbi
+#define sbi(sfr, bit) (_SFR_BYTE(sfr) |= _BV(bit))
+#endif
+
+int8_t pinToChannel(uint8_t pin) {
+#if defined(analogPinToChannel)
+    return pin >= A0 ? analogPinToChannel(pin - A0) : -1;
+#else
+    return pin >= A0 ? pin -= A0 : -1;
+#endif
 }
 
-void sbi(uint8_t sfr, uint8_t bit) {
-    _SFR_BYTE(sfr) |= _BV(bit);
-}
+namespace AVRIO {
+uint8_t Pin::analog_reference = (uint8_t)aref_t::Default << Pin::arefShift;
 
-AVRIO::Pin::Pin() {}
+Pin::Pin() {}
 
-AVRIO::Pin::Pin(byte pin, pin_m mode) {
+Pin::Pin(byte pin, pin_m mode) {
     uint8_t port = digitalPinToPort(pin);  // Converts the pin number to the pin port
 
     this->portMode = portModeRegister(port);   // Gets the port mode register
@@ -23,53 +33,36 @@ AVRIO::Pin::Pin(byte pin, pin_m mode) {
     this->isInterruptCapable = (interruptNum != NOT_AN_INTERRUPT);  // Sets the interrupt capable flag
 
     this->isPWMCapable = digitalPinHasPWM(pin);  // Sets the pwm capable flag
-    this->pwmOn = false;                         // lalalalalalalalalalalalalalalalalalalala
+    this->pwmOn = false;                         // Initializes PWM ON flag
+
+    this->adcChannel = pinToChannel(pin);   // Stores the analog pin channel
+    this->isADCCapable = adcChannel != -1;  // Sets the adc capable flag
 
     this->arduinoPin = pin;  // Stores the arduino pin passed in the constructor
     this->fState = 0;        // Sets the initial falling edge state
     this->rState = 1;        // Sets the initial rising edge state
 
     this->mode = mode;  // Stores the pin mode
+
+    this->initFlag = false;  // Initializes initFlag to false
 }
 
-void AVRIO::Pin::init() const {
-    byte oldSREG = SREG;  // NAO SEI
-
-    noInterrupts();  // Disables interrupts
-
-    switch (mode) {
-        case pin_m::Input:  ///< Sets the pin as an input pin
-            *portMode &= ~pinMask;
-            *portOut &= ~pinMask;
-            break;
-        case pin_m::InputPullup:  ///< Sets the pin as an input pullup pin
-            *portMode &= ~pinMask;
-            *portOut |= pinMask;
-            break;
-        case pin_m::Output:  ///< Sets the pin as an output pin
-            *portMode |= pinMask;
-            *portOut &= ~pinMask;
-            break;
-        case pin_m::Pwm:  ///< Sets the pin as a PWM output pin
-            if (!turnOnPWM())
-                pinMode(pin_m::Input);
-            break;
-    }
-
-    SREG = oldSREG;
-    interrupts();  // Enables interrupts
+void Pin::init() const {
+    this->initFlag = true;
+    pinMode(this->mode);
+    this->initFlag = false;
 }
-void AVRIO::Pin::pinMode(const pin_m& mode) const {
-    if (mode == this->mode)  // If mode is equal to current mode return from the function
+
+void Pin::pinMode(const pin_m& mode) const {
+    if (!initFlag && mode == this->mode)  // If mode is equal to current mode return from the function
         return;
 
-    // turnOffPWM();                              // Turns off PWM on the pin
     if (this->mode == pin_m::Pwm)
-        Arduino_h::digitalRead(this->arduinoPin);  // TEMPORARY: Turns off pwm, method above doesn't work
+        turnOffPWM();  // Turns off PWM on the pin
 
     this->mode = mode;  // Stores new mode
 
-    byte oldSREG = SREG;  // NAO SEI
+    byte oldSREG = SREG;  // Stores the status register
 
     noInterrupts();  // Disables interrupts
 
@@ -87,16 +80,26 @@ void AVRIO::Pin::pinMode(const pin_m& mode) const {
             *portOut &= ~pinMask;
             break;
         case pin_m::Pwm:  ///< Sets the pin as a PWM output pin
-            if (!turnOnPWM())
-                pinMode(pin_m::Input);
+            if (turnOnPWM()) {
+                // Sets pin as output pin
+                *portMode |= pinMask;
+                *portOut &= ~pinMask;
+            } else {
+                // Sets pin as input pin
+                *portMode &= ~pinMask;
+                *portOut &= ~pinMask;
+            }
             break;
     }
 
-    SREG = oldSREG;
-    interrupts();  // Enables interrupts
+    SREG = oldSREG;  // Sets the status register to stored value
+    interrupts();    // Enables interrupts
 }
 
-uint8_t AVRIO::Pin::digitalRead(const edge_t& mode) const {
+uint8_t Pin::digitalRead(const edge_t& mode) const {
+    uint8_t oldSREG = SREG;  // Stores the status register
+    noInterrupts();          // Disables interrupts
+
     byte reading = (*portIn & pinMask) ? 1 : 0;  // The digital pin reading
 
     switch (mode) {
@@ -113,10 +116,12 @@ uint8_t AVRIO::Pin::digitalRead(const edge_t& mode) const {
         default:  // Returns the pin's state as is
             return reading;
     }
+    SREG = oldSREG;  // Sets the status register to stored value
+    interrupts();    // Enables interrupts
 }
 
-void AVRIO::Pin::digitalWrite(const write_t& state) const {
-    uint8_t oldSREG = SREG;  // NAO SEI
+void Pin::digitalWrite(const write_t& state) const {
+    uint8_t oldSREG = SREG;  // Stores the status register
     noInterrupts();          // Disables interrupts
 
     switch (state) {
@@ -131,27 +136,15 @@ void AVRIO::Pin::digitalWrite(const write_t& state) const {
             break;
     }
 
-    SREG = oldSREG;  // NAO SEI
+    SREG = oldSREG;  // Sets the status register to stored value
     interrupts();    // Enables interrupts
 }
 
-uint16_t AVRIO::Pin::analogRead() const {
-    if (this->pwmOn)  // If pwm is on uashuashuahsuhuas
-        return 0;
-
-    return Arduino_h::analogRead(arduinoPin);  // Returns the analog reading on the pin
-}
-
-void AVRIO::Pin::analogWrite(uint16_t val) const {
-    if (this->pwmOn)
-        Arduino_h::analogWrite(this->arduinoPin, val);
-}
-
-uint8_t AVRIO::Pin::getPin() const {
+uint8_t Pin::getPin() const {
     return this->arduinoPin;
 }
 
-bool AVRIO::Pin::attachInterrupt(edge_t mode, void (*callback)()) const {
+bool Pin::attachInterrupt(edge_t mode, void (*callback)()) const {
     if (this->isInterruptCapable && this->isSetAsInput()) {
         EIFR = 0x01;
         Arduino_h::attachInterrupt(this->interruptNum, callback, (int)mode);
@@ -160,26 +153,92 @@ bool AVRIO::Pin::attachInterrupt(edge_t mode, void (*callback)()) const {
     return isInterruptCapable;
 }
 
-bool AVRIO::Pin::detachInterrupt() const {
+bool Pin::detachInterrupt() const {
     if (this->isInterruptCapable) {
         Arduino_h::detachInterrupt(interruptNum);
     }
+
     return isInterruptCapable;
 }
+uint16_t Pin::analogRead() const {
+    if (this->pwmOn || !this->isADCCapable)  // If pwm is on return
+        return 0;
 
-bool AVRIO::Pin::turnOnPWM() const {
+    // Sets adc registers
+    this->setADCRegisters();
+
+    // Starts the conversion
+    sbi(ADCSRA, ADSC);
+
+    // Waits for the conversion to finish
+    while (bit_is_set(ADCSRA, ADSC))
+        ;
+
+    uint8_t lowByte = ADCL;   // Reads ADC L byte
+    uint8_t highByte = ADCH;  // Reads ADC H byte
+
+    // Combine the two bytes and return reading
+    return (highByte << 8) | lowByte;
+}
+
+bool Pin::asyncAnalogRead(std::function<void(uint16_t reading)> callback) const {
+    // If PWM is on or pin does not have an ADC return
+    if (this->pwmOn || !this->isADCCapable) {
+        callback(0);
+        return true;
+    }
+    static bool polling = false;
+    static int8_t busy = -1;
+
+    if (!polling && busy == -1) {
+        // Set the registers
+        this->setADCRegisters();
+        // Start the conversion
+        sbi(ADCSRA, ADSC);
+        polling = true;
+        busy = this->arduinoPin;
+    }
+    if (busy == this->arduinoPin && polling && !bit_is_set(ADCSRA, ADSC)) {
+        uint8_t lowByte = ADCL, highByte = ADCH;
+        callback((highByte << 8) | lowByte);
+        polling = false;
+        busy = -1;
+        return true;
+    }
+    return false;
+}
+void Pin::analogWrite(uint16_t val) const {
+    if (!this->pwmOn)
+        return;
+
+    // Arduino's analogWrite is already sufficiently fast
+    // No need to rewrite it for now
+    Arduino_h::analogWrite(this->arduinoPin, val);
+}
+
+void Pin::setADCRegisters() const {
+#if defined(ADCSRB) && defined(MUX5)
+    // the MUX5 bit of ADCSRB selects whether we're reading from channels
+    // 0 to 7 (MUX5 low) or 8 to 15 (MUX5 high).
+    ADCSRB = (ADCSRB & ~(1 << MUX5)) | (((this->adcChannel >> 3) & 0x01) << MUX5);
+#endif
+    // set the analog reference and select the channel
+#if defined(ADMUX)
+    ADMUX = (Pin::analog_reference) | (this->adcChannel & 0x07);
+#endif
+}
+
+bool Pin::turnOnPWM() const {
     if (!this->isPWMCapable || this->isSetAsInput()) {
         return false;
     }
-
-    Arduino_h::analogWrite(this->arduinoPin, 127);
 
     this->pwmOn = true;
 
     return true;
 }
 
-bool AVRIO::Pin::turnOffPWM() const {
+bool Pin::turnOffPWM() const {
     if (!this->isPWMCapable || !this->pwmOn) {
         return false;
     }
@@ -286,6 +345,7 @@ bool AVRIO::Pin::turnOffPWM() const {
     return true;
 }
 
-bool AVRIO::Pin::isSetAsInput() const {
+bool Pin::isSetAsInput() const {
     return this->mode == pin_m::Input || this->mode == pin_m::InputPullup;
 }
+}  // namespace AVRIO

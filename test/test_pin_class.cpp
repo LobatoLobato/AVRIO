@@ -1,10 +1,11 @@
 #include "test_pin_class.h"
-const AVRIO::Pin DPIN3(3);   // Nano's D3 |PWM/Interrupt capable
-const AVRIO::Pin DPIN4(4);   // Nano's D4 |Normal pin
-const AVRIO::Pin APIN7(A7);  // Nano's A7 |Analog pin
+const AVRIO::Pin DPIN3(3);   // Nano's D3 | PWM/Interrupt capable
+const AVRIO::Pin DPIN4(4);   // Nano's D4 | Normal pin
+const AVRIO::Pin APIN7(A7);  // Nano's A7 | Analog pin
 
 const AVRIO::Pin DPIN5(5, AVRIO::pin_m::Output);  // Nano's D5
 const AVRIO::Pin DPIN2(2, AVRIO::pin_m::Input);   // Nano's D2
+
 void test_pin_static_initialize_pins(void) {
     AVRIO::Pin::initializePins(DPIN5, DPIN2);
     uint8_t reading;
@@ -321,29 +322,84 @@ void test_pin_getPin(void) {
 
 void test_pin_analog(void) {
     uint16_t result;
+    String msg;
+
     DPIN3.pinMode(AVRIO::pin_m::Pwm);
     DPIN4.pinMode(AVRIO::pin_m::Input);
     APIN7.pinMode(AVRIO::pin_m::Input);
 
+    /* Analog Write and Synchronous Analog Read */
     DPIN3.analogWrite(0);
     delay(20);
     result = APIN7.analogRead();
-    TEST_ASSERT_TRUE_MESSAGE(result >= 0 && result <= 5, String(result).c_str());
+    msg = "Expected 0 <= x <= 5 was ";
+    msg += String(result).c_str();
+    TEST_ASSERT_TRUE_MESSAGE(result >= 0 && result <= 5, msg.c_str());
 
     DPIN3.analogWrite(127);
     delay(20);
     result = APIN7.analogRead();
-    TEST_ASSERT_TRUE_MESSAGE(result >= 400 && result <= 600, String(result).c_str());
+    msg = "Expected 400 <= x <= 600 was ";
+    msg += String(result).c_str();
+    TEST_ASSERT_TRUE_MESSAGE(result >= 400 && result <= 600, msg.c_str());
 
     DPIN3.analogWrite(255);
     delay(20);
     result = APIN7.analogRead();
-    TEST_ASSERT_TRUE_MESSAGE(result >= 1000 && result <= 1023, String(result).c_str());
+    msg = "Expected 1000 <= x <= 1023 was ";
+    msg += String(result).c_str();
+    TEST_ASSERT_TRUE_MESSAGE(result >= 1000 && result <= 1023, msg.c_str());
+
+    /* Analog Write and Asynchronous Analog Read */
+    auto callbackFn = [&result](uint16_t reading) -> void { result = reading; };
+
+    DPIN3.analogWrite(0);
+    delay(20);
+    while (!APIN7.asyncAnalogRead(callbackFn)) {
+    }
+    msg = "Expected 0<= x <= 5 was ";
+    msg += String(result).c_str();
+    TEST_ASSERT_TRUE_MESSAGE(result >= 0 && result <= 5, msg.c_str());
+
+    DPIN3.analogWrite(127);
+    delay(20);
+    while (!APIN7.asyncAnalogRead(callbackFn)) {
+    }
+    msg = "Expected 400 <= x <= 600 was ";
+    msg += String(result).c_str();
+    TEST_ASSERT_TRUE_MESSAGE(result >= 400 && result <= 600, msg.c_str());
+
+    DPIN3.analogWrite(255);
+    delay(20);
+    while (!APIN7.asyncAnalogRead(callbackFn)) {
+    }
+    msg = "Expected 1000 <= x <= 1023 was ";
+    msg += String(result).c_str();
+    TEST_ASSERT_TRUE_MESSAGE(result >= 1000 && result <= 1023, msg.c_str());
+
+    /* Analog Write and Synchronous Analog Read with Internal Analog Reference */
+    AVRIO::Pin::setAnalogReference(AVRIO::aref_t::Internal);
 
     DPIN3.analogWrite(0);
     delay(20);
     result = APIN7.analogRead();
-    TEST_ASSERT_TRUE_MESSAGE(result >= 0 && result <= 5, String(result).c_str());
+    msg = "Expected 0 <= x <= 5 was ";
+    msg += String(result).c_str();
+    TEST_ASSERT_TRUE_MESSAGE(result >= 0 && result <= 5, msg.c_str());
+
+    DPIN3.analogWrite(25);
+    delay(20);
+    result = APIN7.analogRead();
+    msg = "Expected 400 <= x <= 600 was ";
+    msg += String(result).c_str();
+    TEST_ASSERT_TRUE_MESSAGE(result >= 400 && result <= 600, msg.c_str());
+
+    DPIN3.analogWrite(51);
+    delay(20);
+    result = APIN7.analogRead();
+    msg = "Expected 1000 <= x <= 1023 was ";
+    msg += String(result).c_str();
+    TEST_ASSERT_TRUE_MESSAGE(result >= 800 && result <= 1023, msg.c_str());
 }
 
 void pin_test_tearDown(void) {

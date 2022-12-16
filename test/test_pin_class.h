@@ -1,16 +1,18 @@
 /* Provides unit testing to
 Target test board = Arduino Nano
-AVRIO{                           |TEST_IMPLEMENTED|
-  static Pin::initializePins()   |        ✓       |
-  Pin::digitalWrite()            |        ✓       |
-  Pin::digitalRead()             |        ✓       |
-  Pin::attachInterrupt()         |        ✓       |
-  Pin::detachInterrupt()         |        ✓       |
-  Pin::analogRead()              |        ✓       |
-  Pin::analogWrite()             |        ✓       |
-  Pin::pinMode()                 |        ✓       |
-  Pin::getPin()                  |        ✓       |
-  Pin::Pin()                     |        ✓       | // If all methods above work the constructor works
+AVRIO{                             |TEST_IMPLEMENTED|
+  static Pin::initializePins()     |        ✓       |
+  static Pin::setAnalogReference() |        ✓       |
+  Pin::digitalWrite()              |        ✓       |
+  Pin::digitalRead()               |        ✓       |
+  Pin::attachInterrupt()           |        ✓       |
+  Pin::detachInterrupt()           |        ✓       |
+  Pin::analogRead()                |        ✓       |
+  Pin::asyncAnalogRead()           |        ✓       |
+  Pin::analogWrite()               |        ✓       |
+  Pin::pinMode()                   |        ✓       |
+  Pin::getPin()                    |        ✓       |
+  Pin::Pin()                       |        ✓       | // If all methods above work the constructor works
 }
 */
 #pragma once
