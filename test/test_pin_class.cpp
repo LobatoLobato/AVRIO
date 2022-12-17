@@ -351,6 +351,45 @@ void test_pin_analog(void) {
     TEST_ASSERT_TRUE_MESSAGE(result >= 1000 && result <= 1023, msg.c_str());
 
     /* Analog Write and Asynchronous Analog Read */
+    AVRIO::Pin::asyncADCReturnType ar7;
+
+    DPIN3.analogWrite(0);
+    delay(20);
+    ar7 = APIN7.asyncAnalogRead();
+    while (!ar7.ready()) {
+    }
+    result = ar7.read();
+    msg = "Expected 0<= x <= 5 was ";
+    msg += String(result).c_str();
+    TEST_ASSERT_TRUE_MESSAGE(result >= 0 && result <= 5, msg.c_str());
+
+    DPIN3.analogWrite(127);
+    delay(20);
+    ar7 = APIN7.asyncAnalogRead();
+    while (!ar7.ready()) {
+    }
+    result = ar7.read();
+    msg = "Expected 400 <= x <= 600 was ";
+    msg += String(result).c_str();
+    TEST_ASSERT_TRUE_MESSAGE(result >= 400 && result <= 600, msg.c_str());
+
+    DPIN3.analogWrite(255);
+    delay(20);
+    ar7 = APIN7.asyncAnalogRead();
+    while (!ar7.ready()) {
+    }
+    result = ar7.read();
+    msg = "Expected 1000 <= x <= 1023 was ";
+    msg += String(result).c_str();
+    TEST_ASSERT_TRUE_MESSAGE(result >= 1000 && result <= 1023, msg.c_str());
+
+    DPIN3.analogWrite(255);
+    delay(20);
+    ar7 = APIN7.asyncAnalogRead();
+    result = ar7.read();
+    TEST_ASSERT_EQUAL_UINT16(0, result);
+
+    /* Analog Write and Asynchronous Analog Read with Callback*/
     auto callbackFn = [&result](uint16_t reading) -> void { result = reading; };
 
     DPIN3.analogWrite(0);

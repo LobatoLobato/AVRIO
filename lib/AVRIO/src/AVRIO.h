@@ -264,11 +264,21 @@ class Pin {
     /// then polling the result in subsequent calls until the conversion is finished,
     /// then, when it is finished, calling the callback function passed as a parameter.
     /// @warning Do not use this function in multiple pins simultanously, this won't work since the arduino only has one ADC inside it.
-    /// This method is written in a way that prevents this from breaking/bricking the arduino, but the reading result may come out wrong
+    /// This method is written in a way that prevents this from breaking anything inside the arduino, but the reading result may come out wrong
     /// so it is preferred not to use it this way.
     /// @param callback The function that will be executed when the adc conversion is complete
     /// @return The status of the conversion, true if ended, false if polling
-    bool asyncAnalogRead(std::function<void(uint16_t reading)> callback) const;
+    bool asyncAnalogRead(std::function<void(uint16_t result)> callback) const;
+
+    struct asyncADCReturnType {
+        std::function<bool()> ready;
+        std::function<uint16_t()> read;
+    };
+    /// @brief Non blocking version of analog read, starts the conversion when called
+    /// and returns functions for checking if conversion is complete and for reading the conversion result.
+    /// @returns A struct containing ready() and read() functions, ready() returns true when
+    /// conversion is ready, and read() returns the conversion result.
+    asyncADCReturnType asyncAnalogRead() const;
 
     /// @brief Writes an analog value through pwm
     /// @param val  8 bit 'pwm' value

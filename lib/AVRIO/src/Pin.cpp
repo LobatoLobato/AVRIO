@@ -160,6 +160,7 @@ bool Pin::detachInterrupt() const {
 
     return isInterruptCapable;
 }
+
 uint16_t Pin::analogRead() const {
     if (this->pwmOn || !this->isADCCapable)  // If pwm is on return
         return 0;
@@ -181,7 +182,30 @@ uint16_t Pin::analogRead() const {
     return (highByte << 8) | lowByte;
 }
 
-bool Pin::asyncAnalogRead(std::function<void(uint16_t reading)> callback) const {
+Pin::asyncADCReturnType Pin::asyncAnalogRead() const {
+    if (this->pwmOn || !this->isADCCapable) {
+        return {[]() { return true; }, []() { return 0; }};
+    }
+
+    // Set the registers
+    this->setADCRegisters();
+
+    // Start the conversion
+    sbi(ADCSRA, ADSC);
+
+    std::function<bool()> ready = []() -> bool {
+        return !bit_is_set(ADCSRA, ADSC);
+    };
+    std::function<uint16_t()> read = []() -> uint16_t {
+        if (bit_is_set(ADCSRA, ADSC))
+            return 0;
+        uint8_t lowByte = ADCL, highByte = ADCH;
+        return (highByte << 8) | lowByte;
+    };
+    return {ready, read};
+}
+
+bool Pin::asyncAnalogRead(std::function<void(uint16_t result)> callback) const {
     // If PWM is on or pin does not have an ADC return
     if (this->pwmOn || !this->isADCCapable) {
         callback(0);
@@ -193,20 +217,24 @@ bool Pin::asyncAnalogRead(std::function<void(uint16_t reading)> callback) const 
     if (!polling && busy == -1) {
         // Set the registers
         this->setADCRegisters();
+
         // Start the conversion
         sbi(ADCSRA, ADSC);
+
         polling = true;
         busy = this->arduinoPin;
     }
     if (busy == this->arduinoPin && polling && !bit_is_set(ADCSRA, ADSC)) {
         uint8_t lowByte = ADCL, highByte = ADCH;
         callback((highByte << 8) | lowByte);
+
         polling = false;
         busy = -1;
         return true;
     }
     return false;
 }
+
 void Pin::analogWrite(uint16_t val) const {
     if (!this->pwmOn)
         return;
