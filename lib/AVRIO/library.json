@@ -1,7 +1,7 @@
 {
   "$schema": "https://raw.githubusercontent.com/platformio/platformio-core/develop/platformio/assets/schema/library.json",
   "name": "AVRIO",
-  "version": "2.0.5",
+  "version": "2.0.6",
   "description": "Fast Pin IO library for AVR Architecture. Abstracts pins into a Pin class that stores register adresses when instantiated for faster and easier pin manipulation.",
   "keywords": "io, avr",
   "repository": {
@@ -17,11 +17,7 @@
   "license": "MIT",
   "frameworks": "ARDUINO",
   "platforms": "*",
-  "dependencies": [
-    {
-      "owner": "hideakitai",
-      "name": "ArxTypeTraits",
-      "version": "0.2.3"
-    }
-  ]
+  "dependencies": {
+    "hideakitai/ArxTypeTraits": "^0.2.3"
+  }
 }
