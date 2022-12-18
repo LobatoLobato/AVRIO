@@ -161,6 +161,22 @@ bool Pin::detachInterrupt() const {
     return isInterruptCapable;
 }
 
+void Pin::setADCRegisters() const {
+#if defined(ADCSRB) && defined(MUX5)
+    // the MUX5 bit of ADCSRB selects whether we're reading from channels
+    // 0 to 7 (MUX5 low) or 8 to 15 (MUX5 high).
+    ADCSRB = (ADCSRB & ~(1 << MUX5)) | (((this->adcChannel >> 3) & 0x01) << MUX5);
+#endif
+    // set the analog reference and select the channel
+#if defined(ADMUX)
+    ADMUX = (Pin::analog_reference) | (this->adcChannel & 0x07);
+#endif
+}
+
+void Pin::startADCConversion() const {
+    sbi(ADCSRA, ADSC);
+}
+
 uint16_t Pin::analogRead() const {
     if (this->pwmOn || !this->isADCCapable)  // If pwm is on return
         return 0;
@@ -169,17 +185,13 @@ uint16_t Pin::analogRead() const {
     this->setADCRegisters();
 
     // Starts the conversion
-    sbi(ADCSRA, ADSC);
+    this->startADCConversion();
 
     // Waits for the conversion to finish
     while (bit_is_set(ADCSRA, ADSC))
         ;
-
-    uint8_t lowByte = ADCL;   // Reads ADC L byte
-    uint8_t highByte = ADCH;  // Reads ADC H byte
-
-    // Combine the two bytes and return reading
-    return (highByte << 8) | lowByte;
+    // Return ADC reading
+    return ADC;
 }
 
 Pin::asyncADCReturnType Pin::asyncAnalogRead() const {
@@ -187,20 +199,19 @@ Pin::asyncADCReturnType Pin::asyncAnalogRead() const {
         return {[]() { return true; }, []() { return 0; }};
     }
 
-    // Set the registers
-    this->setADCRegisters();
+    if (!bit_is_set(ADCSRA, ADSC)) {
+        // Set the registers
+        this->setADCRegisters();
 
-    // Start the conversion
-    sbi(ADCSRA, ADSC);
+        // Start the conversion
+        this->startADCConversion();
+    }
 
     std::function<bool()> ready = []() -> bool {
         return !bit_is_set(ADCSRA, ADSC);
     };
     std::function<uint16_t()> read = []() -> uint16_t {
-        if (bit_is_set(ADCSRA, ADSC))
-            return 0;
-        uint8_t lowByte = ADCL, highByte = ADCH;
-        return (highByte << 8) | lowByte;
+        return bit_is_set(ADCSRA, ADSC) ? 0 : ADC;
     };
     return {ready, read};
 }
@@ -219,15 +230,13 @@ bool Pin::asyncAnalogRead(std::function<void(uint16_t result)> callback) const {
         this->setADCRegisters();
 
         // Start the conversion
-        sbi(ADCSRA, ADSC);
+        this->startADCConversion();
 
         polling = true;
         busy = this->arduinoPin;
     }
     if (busy == this->arduinoPin && polling && !bit_is_set(ADCSRA, ADSC)) {
-        uint8_t lowByte = ADCL, highByte = ADCH;
-        callback((highByte << 8) | lowByte);
-
+        callback(ADC);
         polling = false;
         busy = -1;
         return true;
@@ -242,18 +251,6 @@ void Pin::analogWrite(uint16_t val) const {
     // Arduino's analogWrite is already sufficiently fast
     // No need to rewrite it for now
     Arduino_h::analogWrite(this->arduinoPin, val);
-}
-
-void Pin::setADCRegisters() const {
-#if defined(ADCSRB) && defined(MUX5)
-    // the MUX5 bit of ADCSRB selects whether we're reading from channels
-    // 0 to 7 (MUX5 low) or 8 to 15 (MUX5 high).
-    ADCSRB = (ADCSRB & ~(1 << MUX5)) | (((this->adcChannel >> 3) & 0x01) << MUX5);
-#endif
-    // set the analog reference and select the channel
-#if defined(ADMUX)
-    ADMUX = (Pin::analog_reference) | (this->adcChannel & 0x07);
-#endif
 }
 
 bool Pin::turnOnPWM() const {

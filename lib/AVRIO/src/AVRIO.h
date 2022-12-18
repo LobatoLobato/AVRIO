@@ -1,4 +1,6 @@
 #pragma once
+#ifndef __AVRIO_H__
+#define __AVRIO_H__
 
 #include <Arduino.h>
 #include <ArxTypeTraits.h>
@@ -60,6 +62,8 @@ enum class bit_order : uint8_t {
     LSBFirst = 0
 };
 
+uint32_t readVcc();
+
 class Pin {
    private:
     byte arduinoPin;          ///< Arduino Pin
@@ -104,6 +108,7 @@ class Pin {
     /// @param type The type of reference the arduino will use
     static void setAnalogReference(aref_t type) {
         analog_reference = (uint8_t)type << arefShift;
+        Arduino_h::analogReference((uint8_t)type);
     }
 
     /// @brief Reads serial data in |i.e: from a shift register
@@ -311,8 +316,8 @@ class Pin {
     /// @brief Verifies if the pin is set as an input or input pull-up
     /// @return True if pin is an input and False otherwise
     bool isSetAsInput() const;
-
     void setADCRegisters() const;
+    void startADCConversion() const;
 };
 
 // /// @brief Class representing a switch
@@ -332,3 +337,4 @@ class Pin {
 // };
 
 }  // namespace AVRIO
+#endif

@@ -1,7 +1,7 @@
 {
   "$schema": "https://raw.githubusercontent.com/platformio/platformio-core/develop/platformio/assets/schema/library.json",
   "name": "AVRIO",
-  "version": "2.0.8",
+  "version": "2.0.7",
   "description": "Fast Pin IO library for AVR Architecture. Abstracts pins into a Pin class that stores register adresses when instantiated for faster and easier pin manipulation.",
   "keywords": "io, avr",
   "repository": {
