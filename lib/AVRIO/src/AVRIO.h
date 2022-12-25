@@ -2,6 +2,19 @@
 #ifndef __AVRIO_H__
 #define __AVRIO_H__
 
+/****************************************
+ * @author Felipe Ribeiro Lobato
+ * @brief Optimized IO library for AVR Architecture Micro Controllers.
+ * @section Compatibility
+ * This library is compatible with the **avr** architecture so you should be able to use it on the following Arduino boards:
+ * - [Arduino Micro](https://store.arduino.cc/arduino-micro)
+ * - [Arduino Leonardo](https://store.arduino.cc/arduino-leonardo-with-headers)
+ * - [Arduino Mega](https://store.arduino.cc/arduino-mega-2560-rev3)
+ * - [Arduino Nano](https://store.arduino.cc/arduino-nano)
+ * - [Arduino Uno](https://store.arduino.cc/arduino-uno-rev3)
+ * - [Arduino Yún](https://store.arduino.cc/arduino-yun-rev-2)
+ ****************************************/
+
 #include <Arduino.h>
 #include <ArxTypeTraits.h>
 
@@ -16,8 +29,8 @@ enum class output_m : uint8_t {
 };
 enum class pin_m : uint8_t {
     Input = 0,
-    Output = 1,
     InputPullup = 2,
+    Output = 1,
     Pwm = 3
 };
 enum class edge_t : uint8_t {
@@ -31,6 +44,10 @@ enum class write_t : uint8_t {
     Low = 0,
     High = 1,
     Toggle = 2
+};
+enum class bit_order : uint8_t {
+    MSBFirst = 1,
+    LSBFirst = 0
 };
 enum class aref_t : uint8_t {
 #if defined(__AVR_ATtiny24__) || defined(__AVR_ATtiny44__) || defined(__AVR_ATtiny84__)
@@ -57,13 +74,23 @@ enum class aref_t : uint8_t {
     External = 0
 #endif
 };
-enum class bit_order : uint8_t {
-    MSBFirst = 1,
-    LSBFirst = 0
-};
 
+/// @brief Reads the vcc voltage being fed to the arduino
+/// @warning Consider a +-10% tolerance on the voltage returned by this function
+/// @warning Always use a resistor between external voltage references and the AREF pin if using this function.
+/// If a voltage source is currently directly connected to the AREF pin
+/// this function will cause a short circuit and damage the aref pin or kill the microcontroller.
+/// @returns The vcc voltage in millivolts
+/// @code{.cpp}
+/// // Voltmeter example
+/// AVRIO::Pin pin(A0);
+///
+/// float VREF = AVRIO::readVcc() / 1000; // Sets the voltage reference
+/// float voltage = pin.analogRead() * VREF / 1024; // Reads the voltage in A0
+/// @endcode
 uint32_t readVcc();
 
+// Bunda
 class Pin {
    private:
     byte arduinoPin;          ///< Arduino Pin
@@ -98,17 +125,51 @@ class Pin {
     /// @brief Calls init method on all pins passed as arguments
     static void initializePins() {}
     /// @brief Calls init method on all pins passed as arguments
-    template <typename... Args>
-    static void initializePins(Pin pin, Args... args) {
+    /// @code{.cpp}
+    /// AVRIO::Pin pin1(1, AVRIO::pin_m::Input);
+    /// AVRIO::Pin pin2(2, AVRIO::pin_m::InputPullup);
+    /// AVRIO::Pin pin3(3, AVRIO::pin_m::Output);
+    /// AVRIO::Pin pin4(4, AVRIO::pin_m::Pwm);
+    ///
+    /// void setup() {
+    ///    // Calls Pin::init on pin[1...4]
+    ///    AVRIO::Pin::initializePins(pin1, pin2, pin3, pin4);
+    /// }
+    /// @endcode
+    template <typename... Pins>
+    static void initializePins(Pin pin, Pins... pins) {
         pin.init();
-        initializePins(args...);
+        initializePins(pins...);
     }
 
     /// @brief Sets the arduino's analog reference type
     /// @param type The type of reference the arduino will use
+    /// @code{.cpp}
+    /// AVRIO::Pin pin(1);
+    /// // Sets analog reference to default (vcc)
+    /// AVRIO::Pin::setAnalogReference(AVRIO::aref_t::Default);
+    /// pin.analogRead();
+    /// // Sets analog reference to internal (1v1 on Uno)
+    /// AVRIO::Pin::setAnalogReference(AVRIO::aref_t::Internal);
+    /// pin.analogRead();
+    /// // Sets analog reference to external
+    /// AVRIO::Pin::setAnalogReference(AVRIO::aref_t::External);
+    /// pin.analogRead();
+    /// @endcode
     static void setAnalogReference(aref_t type) {
         analog_reference = (uint8_t)type << arefShift;
         Arduino_h::analogReference((uint8_t)type);
+    }
+
+    /// @brief Gets the analog reference value currently being used
+    /// @return The current analog reference value
+    /// @code{.cpp}
+    /// AVRIO::Pin::setAnalogReference(AVRIO::aref_t::Default);
+    /// // Var analogReference will receive ((uint8_t)aref_t::Default << someNumber)
+    /// uint8_t analogReference = AVRIO::Pin::getAnalogReference();
+    /// @endcode
+    static uint8_t getAnalogReference() {
+        return analog_reference;
     }
 
     /// @brief Reads serial data in |i.e: from a shift register
@@ -117,7 +178,9 @@ class Pin {
     /// @param dataPin The data input pin
     /// @param clockPin The clock output pin
     /// @param bitOrder The bit order (LSBFirst|MSBFirst)
-    /// @return The data read from the shift register
+    /// @return The data read from the shift
+    /// @code{.cpp}
+    /// @endcode
     template <typename T = uint8_t, typename = std::enable_if_t<std::is_unsigned<T>::value>>
     static T shiftIn(Pin dataPin, Pin clockPin, bit_order bitOrder = bit_order::LSBFirst) {
         T value = 0;
@@ -142,6 +205,8 @@ class Pin {
     /// @param bitOrder The bit order (LSBFirst|MSBFirst)
     /// @param pulseDelay The time between clock pulse's low and high state
     /// @return The data read from the shift register
+    /// @code{.cpp}
+    /// @endcode
     template <typename T = uint8_t, typename = std::enable_if_t<std::is_unsigned<T>::value>>
     static T shiftIn(Pin dataPin, Pin clockPin, bit_order bitOrder, uint64_t pulseDelay, bool ms = false) {
         T value = 0;
@@ -169,6 +234,8 @@ class Pin {
     /// @param clockPin The clock output pin
     /// @param val The value to be sent
     /// @param bitOrder The bit order (LSBFirst|MSBFirst)
+    /// @code{.cpp}
+    /// @endcode
     template <typename T = uint8_t, typename = std::enable_if_t<std::is_unsigned<T>::value>>
     static void shiftOut(Pin dataPin, Pin clockPin, T val, bit_order bitOrder = bit_order::LSBFirst) {
         T mod = -1;
@@ -195,6 +262,8 @@ class Pin {
     /// @param bitOrder The bit order (LSBFirst|MSBFirst)
     /// @param pulseDelay The time between clock pulse's low and high state
     /// @param dataDelay The time between each bit write
+    /// @code{.cpp}
+    /// @endcode
     template <typename T = uint8_t, typename = std::enable_if_t<std::is_unsigned<T>::value>>
     static void shiftOut(Pin dataPin, Pin clockPin, T val, bit_order bitOrder, uint64_t pulseDelay, uint64_t dataDelay, bool ms = false) {
         T mod = -1;
@@ -226,43 +295,57 @@ class Pin {
     /// @brief Pin Constructor
     /// @param pin The arduino pin
     /// @param mode The pin mode
+    /// @code{.cpp}
+    /// @endcode
     Pin(byte pin, pin_m mode = pin_m::Input);
 
     /// @brief Sets the pin's mode
     /// Only needed if the pin was declared at the global scope and
     /// pin mode was passed to the constructor
+    /// @code{.cpp}
+    /// @endcode
     void init() const;
 
-    /// @brief Getter for the arduino pin number
-    /// @return Arduino pin number
-    uint8_t getPin() const;
+    /// @brief Sets the pin's mode
+    /// @param mode The Pin Mode
+    /// @code{.cpp}
+    /// Pin pin(1);
+    /// pin.pinMode(INPUT); //Sets the pin as an input
+    /// pin.pinMode(INPUT_PULLUP); //Sets the pin as an input with a pull-up resistor
+    /// pin.pinMode(OUTPUT); //Sets the pin as an output
+    /// pin.pinMode(PWM); //Sets the pin as a PWM output
+    /// @endcode
+    void pinMode(const pin_m& mode) const;
 
     /// @brief Reads a digital value on the pin
-    /// @param mode Digital Read Mode:
-    /// @param 0: No Edge Detection,
-    /// @param 1: On Change,
-    /// @param 2: On Falling Edge,
-    /// @param 3: On Rising Edge.
+    /// @param mode Digital Read Mode
     /// @return Digital value [1] | [0]
+    /// @code{.cpp}
+    /// Pin pin(1, INPUT);
+    /// int reading;
+    /// reading = pin.digitalRead(); //Returns the pin's current state
+    /// reading = pin.digitalRead(CHANGE); //Returns 1 whenever the pin's state changes
+    /// reading = pin.digitalRead(FALLING); //Returns 1 when the pin's state goes from 1 to 0
+    /// reading = pin.digitalRead(RISING); //Returns 1 when the pin's state goes from 0 to 1
+    /// @endcode
     uint8_t digitalRead(const edge_t& mode = edge_t::None) const;
 
     /// @brief Writes a digital value to the pin [1, 0]
     /// @param state State to set the pin
-    /// @param 0: Low,
-    /// @param 1: High,
-    /// @param 2: Toggle.
+    /// @code{.cpp}
+    /// Pin pin(1, OUTPUT);
+    /// pin.digitalWrite(LOW); //Sets the pin's state to low
+    /// pin.digitalWrite(HIGH); //Sets the pin's state to high
+    /// pin.digitalWrite(TOGGLE); //Toggles the pin's current state
+    /// @endcode
     void digitalWrite(const write_t& state) const;
-
-    /// @brief Sets the pin's mode
-    /// @param mode The Pin Mode:
-    /// @param 0: Input,
-    /// @param 1: Output,
-    /// @param 2: Input Pullup,
-    /// @param 3: PWM Output.
-    void pinMode(const pin_m& mode) const;
 
     /// @brief Reads an analog value through the arduino's adc
     /// @return 10 bit analog reading
+    /// @code{.cpp}
+    /// Pin pin(A0, INPUT);
+    /// int reading = pin.analogRead(); //Returns a 10 bit analog reading
+    /// @endcode
     uint16_t analogRead() const;
 
     /// @brief Non blocking version of analog read, works by starting the conversion when called,
@@ -273,6 +356,8 @@ class Pin {
     /// so it is preferred not to use it this way.
     /// @param callback The function that will be executed when the adc conversion is complete
     /// @return The status of the conversion, true if ended, false if polling
+    /// @code{.cpp}
+    /// @endcode
     bool asyncAnalogRead(std::function<void(uint16_t result)> callback) const;
 
     struct asyncADCReturnType {
@@ -283,32 +368,67 @@ class Pin {
     /// and returns functions for checking if conversion is complete and for reading the conversion result.
     /// @returns A struct containing ready() and read() functions, ready() returns true when
     /// conversion is ready, and read() returns the conversion result.
+    /// @code{.cpp}
+    /// @endcode
     asyncADCReturnType asyncAnalogRead() const;
 
     /// @brief Writes an analog value through pwm
     /// @param val  8 bit 'pwm' value
+    /// @code{.cpp}
+    /// Pin pin(A0, INPUT);
+    /// pin.analogWrite(127) //Sets the pwm's duty cycle to 50%
+    /// @endcode
     void analogWrite(uint16_t val) const;
 
     /// @brief Attaches an interrupt routine to the pin
-    /// @param callback The function to be called
-    /// @param mode The type of trigger:
-    /// @param LOW: Triggers while the pin is low
-    /// @param FALLING: Triggers when the pin goes low
-    /// @param RISING: Triggers when the pin goes high
-    /// @param CHANGE: Triggers whenever the pin changes its state
+    /// @param callback The callback function
+    /// @param mode The type of trigger
     /// @returns True if the pin is interrupt capable and False otherwise
+    /// @code{.cpp}
+    /// void foo(){
+    ///    // Do something
+    /// }
+    /// Pin pin(2, INPUT);
+    /// bool interruptAttached;
+    /// interruptAttached = pin.attachInterrupt(LOW, foo); //Calls foo while the pin is low
+    /// interruptAttached = pin.attachInterrupt(CHANGE, foo); //Calls foo whenever the pin' state changes
+    /// interruptAttached = pin.attachInterrupt(FALLING, foo); //Calls foo when the pin goes low
+    /// interruptAttached = pin.attachInterrupt(RISING, foo); //Calls foo when the pin goes high
+    /// //interruptAttached will only be true if the pin is interrupt capable.
+    /// @endcode
     bool attachInterrupt(edge_t mode, void (*callback)()) const;
 
     /// @brief Detaches the interrupt routine on the pin
     /// @returns True if the pin is interrupt capable and False otherwise
+    /// @code{.cpp}
+    /// void foo(){
+    ///    // Do something
+    /// }
+    /// Pin pin(2, INPUT);
+    /// bool interruptAttached = pin.attachInterrupt(LOW, foo); //Calls foo while the pin is low
+    /// bool interruptDetached = pin.detachInterrupt(); //Removes the interrupt routine attached above
+    /// //interruptDetached will only be true if the pin is interrupt capable.
+    /// @endcode
     bool detachInterrupt() const;
+
+    /// @brief Getter for the arduino pin number
+    /// @return Arduino pin number
+    /// @code{.cpp}
+    /// Pin pin(1);
+    /// //Dumb example but
+    /// int pinNumber = pin.getPin(); //Assigns 1, integer used in the constructor, to 'pinNumber'
+    /// digitalWrite(pin.getPin(), LOW); //Sets the pin's state to low using Arduino's digitalWrite()
+    /// @endcode
+    uint8_t getPin() const;
 
    protected:
     /// @brief Turns pwm on
     /// @return True if pin is pwm capable and False otherwise.
     bool turnOnPWM() const;
 
-    /// @brief Turns pwm off
+    /// @brief Turns
+    /// pwm
+    /// off
     /// @return True if pin is pwm capable and False otherwise.
     bool turnOffPWM() const;
 
